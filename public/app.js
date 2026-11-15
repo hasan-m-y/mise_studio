@@ -1,3 +1,4 @@
+import { aggregateIngredients } from "./ingredient-aggregation.js";
 import { loadWorkspace, encodeBackup, decodeBackup } from "./storage.js";
 import { timelineTime, timelineModel } from "./timeline-model.js";
 const app = document.querySelector("#app");
@@ -927,55 +928,19 @@ function drawRecipes() {
 function drawIngredients() {
   const dishes = allDishes(),
     selected = dishes.filter((x) => attachedRecipe(x.dish));
-  const unique = new Map(),
-    nameCounts = new Map();
+  const nameCounts = new Map();
   for (const { dish } of dishes) {
     const name = dish.name.trim().toLowerCase();
     nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
   }
-  for (const { dish, courseName } of selected) {
+  const edits = project.ingredientEdits || { omitted: [], groups: [] };
+  const ingredients = aggregateIngredients(selected.map(({ dish, courseName }) => {
     const recipe = attachedRecipe(dish);
-    for (const name of recipe.ingredients) {
-      const fullName = name.trim(),
-        key = fullName.toLowerCase().replace(/\s+/g, " ");
-      if (!key) continue;
-      if (!unique.has(key))
-        unique.set(key, { name: fullName, uses: new Map() });
-      const duplicateName = nameCounts.get(dish.name.trim().toLowerCase()) > 1;
-      unique.get(key).uses.set(dish.id, {
-        dishId: dish.id,
-        label:
-          (dish.name.trim() || recipe.title) +
-          (duplicateName ? " · " + courseName : ""),
-        recipeTitle: recipe.title,
-      });
-    }
-  }
-  const edits = (project.ingredientEdits ||= { omitted: [], groups: [] });
-  const omitted = new Set(edits.omitted),
-    grouped = new Set();
-  const ingredients = [];
-  function makeRow(id, keys, groupId) {
-    const parts = keys.map((key) => unique.get(key));
-    return {
-      id,
-      keys,
-      groupId,
-      name: parts.map((p) => p.name).join(", "),
-      uses: new Map(parts.flatMap((p) => [...p.uses])),
-      omitted: keys.every((k) => omitted.has(k)),
-    };
-  }
-  for (const group of edits.groups) {
-    const keys = group.keys.filter((k) => unique.has(k) && !grouped.has(k));
-    keys.forEach((k) => grouped.add(k));
-    if (keys.length) ingredients.push(makeRow(group.id, keys, group.id));
-  }
-  for (const key of unique.keys())
-    if (!grouped.has(key)) ingredients.push(makeRow(key, [key], null));
-  ingredients.sort((a, b) => a.name.localeCompare(b.name));
+    return { recipe, dishId: dish.id, label: (dish.name.trim() || recipe.title) +
+      (nameCounts.get(dish.name.trim().toLowerCase()) > 1 ? " · " + courseName : "") };
+  }), edits);
   document.querySelector("#ingredients-panel").innerHTML =
-    `<div class="recipe-heading"><div><div class="eyebrow">YOUR SHOPPING LIST</div><h2>Ingredients</h2><p>${ingredients.length} ingredients from ${selected.length} selected ${selected.length === 1 ? "recipe" : "recipes"}. ${dishes.length - selected.length} dishes without a saved recipe omitted.</p></div></div>${ingredients.length ? `<p class="ingredient-guide">Select entries to adjust this project’s list. Dish labels open the associated recipe.</p><div class="ingredient-toolbar" role="group" aria-label="Ingredient actions"><label><input type="checkbox" id="ingredients-select-all"> Select all</label><span id="ingredient-selection-count" role="status">0 selected</span><button class="secondary" id="ingredients-omit" disabled>Omit</button><button class="secondary" id="ingredients-combine" disabled>Combine</button></div><ul class="ingredient-list">${ingredients.map((x, i) => `<li><input type="checkbox" class="ingredient-checkbox" id="ingredient-select-${i}" aria-label="Select ${esc(x.name)}"><label class="ingredient-entry${x.omitted ? " ingredient-omitted" : ""}" for="ingredient-select-${i}"><span class="ingredient-name">${esc(x.name)}</span>${x.omitted ? '<small class="ingredient-state">Omitted</small>' : ""}${x.groupId ? '<small class="ingredient-state">Combined</small>' : ""}</label><div class="ingredient-uses${x.omitted ? " ingredient-omitted" : ""}" aria-label="Used in">${[...x.uses.values()].map((use) => `<button class="ingredient-dish" data-ingredient-dish="${esc(use.dishId)}" title="Recipe: ${esc(use.recipeTitle)}" aria-label="View ${esc(use.label)} recipe: ${esc(use.recipeTitle)}">${esc(use.label)}</button>`).join("")}</div>${x.omitted || x.groupId ? `<div class="ingredient-row-actions">${x.omitted ? `<button class="secondary" id="ingredient-include-${i}" aria-label="Include ${esc(x.name)}">Include</button>` : ""}${x.groupId ? `<button class="secondary" id="ingredient-separate-${i}" aria-label="Separate ${esc(x.name)}">Separate</button>` : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="empty"><h3>${selected.length ? "No ingredients on your list." : "Your ingredient list starts with a recipe."}</h3><p>${selected.length ? "Add ingredients to an attached recipe." : "Attach a saved recipe in the Recipes tab."}</p></div>`}<div class="finalize-row"><button class="primary" id="continue-timeline">Continue →</button></div>`;
+    `<div class="recipe-heading"><div><div class="eyebrow">YOUR SHOPPING LIST</div><h2>Ingredients</h2><p>${ingredients.length} ingredients from ${selected.length} selected ${selected.length === 1 ? "recipe" : "recipes"}. ${dishes.length - selected.length} dishes without a saved recipe omitted.</p></div></div>${ingredients.length ? `<p class="ingredient-guide">Select entries to adjust this project’s list. Dish labels open the associated recipe.</p><div class="ingredient-toolbar" role="group" aria-label="Ingredient actions"><label><input type="checkbox" id="ingredients-select-all"> Select all</label><span id="ingredient-selection-count" role="status">0 selected</span><button class="secondary" id="ingredients-omit" disabled>Omit</button><button class="secondary" id="ingredients-combine" disabled>Combine</button></div><ul class="ingredient-list">${ingredients.map((x, i) => `<li><input type="checkbox" class="ingredient-checkbox" id="ingredient-select-${i}" aria-label="Select ${esc(x.name)}"><label class="ingredient-entry${x.omitted ? " ingredient-omitted" : ""}" for="ingredient-select-${i}"><span class="ingredient-name">${esc(x.name)}</span><span class="ingredient-quantity">${esc(x.quantity)}</span>${x.omitted ? '<small class="ingredient-state">Omitted</small>' : ""}${x.groupId ? '<small class="ingredient-state">Combined</small>' : ""}</label><div class="ingredient-uses${x.omitted ? " ingredient-omitted" : ""}" aria-label="Used in">${[...x.uses.values()].map((use) => `<button class="ingredient-dish" data-ingredient-dish="${esc(use.dishId)}" title="Recipe: ${esc(use.recipeTitle)}" aria-label="View ${esc(use.label)} recipe: ${esc(use.recipeTitle)}">${esc(use.label)}</button>`).join("")}</div><details class="ingredient-details"><summary>Amounts and recipe details</summary><ul>${x.occurrences.map(o => `<li>${esc(o.quantity.trim() ? o.quantity : "Quantity unspecified")} ${esc(o.name)} — ${esc(o.label)} (${esc(o.recipeTitle)})</li>`).join("")}</ul></details>${x.omitted || x.groupId ? `<div class="ingredient-row-actions">${x.omitted ? `<button class="secondary" id="ingredient-include-${i}" aria-label="Include ${esc(x.name)}">Include</button>` : ""}${x.groupId ? `<button class="secondary" id="ingredient-separate-${i}" aria-label="Separate ${esc(x.name)}">Separate</button>` : ""}</div>` : ""}</li>`).join("")}</ul>` : `<div class="empty"><h3>${selected.length ? "No ingredients on your list." : "Your ingredient list starts with a recipe."}</h3><p>${selected.length ? "Add ingredients to an attached recipe." : "Attach a saved recipe in the Recipes tab."}</p></div>`}<div class="finalize-row"><button class="primary" id="continue-timeline">Continue →</button></div>`;
   document.querySelector("#continue-timeline").onclick = () => {
     setTab("timeline");
     document.querySelector("#timeline-tab").focus();
@@ -1024,6 +989,7 @@ function drawIngredients() {
       if (action === "combine")
         edits.groups.push({ id: crypto.randomUUID(), keys: originalKeys });
     }
+    project.ingredientEdits = edits;
     save();
     drawIngredients();
   };

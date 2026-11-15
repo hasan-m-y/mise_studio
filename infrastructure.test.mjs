@@ -19,10 +19,13 @@ try {
     "/app.js",
     "/timeline-model.js",
     "/storage.js",
+    "/ingredient-aggregation.js",
     "/style.css",
   ]) {
     const res = await fetch(base + path);
     assert.equal(res.status, 200, path);
+    if (path === "/ingredient-aggregation.js")
+      assert.match(res.headers.get("content-type"), /^text\/javascript/);
     const body = await res.text();
     assert.ok(body.length);
     assert.equal(res.headers.get("x-content-type-options"), "nosniff");

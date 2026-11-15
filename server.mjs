@@ -8,6 +8,7 @@ const routes = new Map([
   ["/", ["index.html", "text/html"]],
   ["/app.js", ["app.js", "text/javascript"]],
   ["/timeline-model.js", ["timeline-model.js", "text/javascript"]],
+  ["/ingredient-aggregation.js", ["ingredient-aggregation.js", "text/javascript"]],
   ["/storage.js", ["storage.js", "text/javascript"]],
   ["/style.css", ["style.css", "text/css"]],
 ]);

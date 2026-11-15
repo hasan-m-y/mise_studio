@@ -124,6 +124,10 @@ function session(path = "/") {
     ).replaceAll("export function", "function"),
     context,
   );
+  vm.runInContext(
+    readFileSync(new URL("./public/ingredient-aggregation.js", import.meta.url), "utf8")
+      .replaceAll("export function", "function"), context,
+  );
   vm.runInContext(source.replace(/^import [\s\S]*?;$/gm, ""), context);
   return {
     context,
@@ -1049,3 +1053,54 @@ await freshImport.node('#backup-file').onchange();
 assert.match(freshImport.node('#backup-status').textContent, /canceled/);
 assert.equal(freshImport.node('#backup-file').value, '');
 console.log('PASS: repository-prefix hash routing, refresh/history, relative assets, complete backup round-trip, cancellation, invalid versions/data, failed writes, stale tabs, and file input errors.');
+
+// Smart aggregation keeps source quantities and persisted keys, without recipe mutation.
+const smart = session('/recipes');
+smart.run(`savedRecipes.smart={id:'smart',title:'Garlic dinner',servings:4,tags:[],ingredients:['Garlic','Minced garlic','Butter','Butter','<img src=x>'],ingredientQuantities:['3 cloves','2 cloves','½ cup','1/2 cup','<script>'],steps:[]};
+createProject();project.courses=[{id:'smart-course',name:'Main',time:'',dishes:[{id:'smart-a',name:'First',recipe:{provider:'custom',id:'smart'}},{id:'smart-b',name:'Second',recipe:{provider:'custom',id:'smart'}}]}];save();setTab('ingredients');`);
+const smartPath = smart.run('routePath()');
+const smartRecipes = smart.run('JSON.stringify(savedRecipes)');
+const smartHTML = () => smart.node('#ingredients-panel').innerHTML;
+assert.match(smartHTML(), /ingredient-quantity">10 cloves<\/span>/);
+assert.match(smartHTML(), /ingredient-quantity">2 cups<\/span>/);
+assert.match(smartHTML(), /2 cloves Minced garlic — First \(Garlic dinner\)/);
+assert.match(smartHTML(), /data-ingredient-dish="smart-a"/);
+assert.match(smartHTML(), /data-ingredient-dish="smart-b"/);
+assert.match(smartHTML(), /&lt;script&gt;/);
+assert.doesNotMatch(smartHTML(), /<img src=x>|<script>/);
+assert.equal(smart.run('JSON.stringify(savedRecipes)'),smartRecipes);
+assert.equal(smart.run('project.ingredientEdits'),undefined);
+smart.run(`delete project.courses[0].dishes[1].recipe;drawIngredients()`);
+assert.match(smartHTML(), /ingredient-quantity">5 cloves<\/span>/);
+smart.run(`project.courses[0].dishes[1].recipe={provider:'custom',id:'smart'};drawIngredients()`);
+assert.match(smartHTML(), /ingredient-quantity">10 cloves<\/span>/);
+const smartIndex = name => [...smartHTML().matchAll(/class="ingredient-name">([^<]*)<\/span>/g)].findIndex(m=>m[1]===name);
+smart.node('#ingredient-select-'+smartIndex('garlic')).onchange({target:{checked:true}});
+smart.node('#ingredients-omit').onclick();
+assert.equal(smart.run('JSON.stringify(project.ingredientEdits.omitted)'), '["garlic","minced garlic"]');
+assert.match(session(smartPath).node('#ingredients-panel').innerHTML,/ingredient-entry ingredient-omitted/);
+smart.node('#ingredient-include-'+smartIndex('garlic')).onclick();
+assert.equal(smart.run('project.ingredientEdits.omitted.length'),0);
+for (const name of ['garlic','Butter']) smart.node('#ingredient-select-'+smartIndex(name)).onchange({target:{checked:true}});
+smart.node('#ingredients-combine').onclick();
+assert.equal(smart.run('project.ingredientEdits.groups[0].keys.length'),3);
+smart.run(`savedRecipes.smart.ingredients=['Garlic','Butter'];savedRecipes.smart.ingredientQuantities=['3 cloves','1 cup'];drawIngredients()`);
+assert.equal(smart.run('project.ingredientEdits.groups[0].keys.length'),3);
+smart.run(`savedRecipes.smart.ingredients=['Garlic','Minced garlic','Butter'];savedRecipes.smart.ingredientQuantities=['3 cloves','2 cloves','1 cup'];drawIngredients()`);
+assert.match(smartHTML(),/Minced garlic/);
+const combinedIndex = [...smartHTML().matchAll(/class="ingredient-name">([^<]*)<\/span>/g)].findIndex(m=>m[1].includes(','));
+smart.node('#ingredient-separate-'+combinedIndex).onclick();
+assert.equal(smart.run('project.ingredientEdits.groups.length'),0);
+assert.match(smartHTML(),/ingredient-quantity">10 cloves<\/span>/);
+smart.run(`project.ingredientEdits.omitted=['minced garlic'];save();drawIngredients()`);
+assert.match(smartHTML(),/ingredient-name">Minced garlic<\/span>/);
+assert.match(smartHTML(),/ingredient-name">Garlic<\/span>/);
+assert.match(session(smartPath).node('#ingredients-panel').innerHTML,/ingredient-name">Minced garlic<\/span>/);
+console.log('PASS: smart shopping totals, preparation/source details, escaping, repeated recipes, attach/unattach, no render mutation, saved omission conflicts, combine/separate, detached group members and refresh.');
+
+smart.run(`savedRecipes.smart.ingredients=['Milk','Milk'];savedRecipes.smart.ingredientQuantities=['1 cup','100 mL'];delete project.courses[0].dishes[1].recipe;drawIngredients()`);
+assert.match(smartHTML(), /ingredient-quantity">≈ 1.42 cups<\/span>/);
+assert.match(smartHTML(), /1 cup Milk — First/);
+assert.match(smartHTML(), /100 mL Milk — First/);
+assert.equal(smart.run('JSON.stringify(savedRecipes.smart.ingredientQuantities)'), '["1 cup","100 mL"]');
+console.log('PASS: approximate mixed-system total with original measurements preserved in recipe details.');

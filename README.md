@@ -16,7 +16,7 @@ Unfinished recipes and edits are stored as drafts and survive refreshing their e
 
 Finalize the planner to open Recipes. Select a saved recipe for each dish, or use Create new recipe. A recipe created from a project is attached to that dish on save, and you return to the same project. Recipes created from the homepage return to the library. Skip for now leaves a dish unassigned; use the dish buttons to revisit it.
 
-Continue opens Ingredients and combines ingredients from attached saved recipes. Full ingredient text is preserved, including alternatives, quantities, and preparation notes. Repeated entries are merged ignoring capitalization and whitespace; differently worded ingredients remain separate. Editing a saved recipe updates every project using it.
+Continue opens Ingredients and combines ingredients from attached saved recipes. Full ingredient text is preserved, including alternatives, quantities, and preparation notes. Repeated entries are merged ignoring capitalization and whitespace. A closed list of fresh garlic and plain onion preparation terms (such as minced garlic and onion, diced) also combines safely; product forms and varieties remain separate. Quantities appear beside the name, with expandable original amounts, preparation instructions, and dish/recipe sources. Each attached dish contributes its quantities, including repeated ingredients. Supported fractions and compatible units total exactly; incompatible units, unknown amounts, and unspecified amounts remain distinct. Cups, tablespoons, and teaspoons use US customary measures; no mass-to-volume, package-size, or clove-to-volume conversion is inferred. Legacy names such as "2 tomatoes" stay intact. Conflicting saved omission states remain separate, and manual groups retain their original keys, including temporarily detached members. Editing a saved recipe updates every project using it.
 
 Existing projects are migrated from the previous storage format. Previous online selections remain in the data, but must be replaced with saved recipes to contribute to the new ingredient list. Recipes are entered and edited locally. No API credentials are needed.
 
@@ -24,7 +24,7 @@ All projects, drafts, and recipes are stored in this browser on this device. Cle
 
 ## Validation
 
-Run `node test.mjs` and `node infrastructure.test.mjs` (or `npm test`) for the workflow and infrastructure suites. The former uses a simulated DOM for workflow tests covering the planner, persistence, deletion, recipe creation and editing, tags, validation, failed storage writes, project attachment and return, skipping, and ingredient aggregation. Run `node --check public/app.js` and `node --check server.mjs` for syntax checks. Browser visual QA is not part of this test suite.
+Run `node test.mjs`, `node ingredient-aggregation.test.mjs`, and `node infrastructure.test.mjs` for the workflow, aggregation, and infrastructure suites. The aggregation suite covers conservative identities, exact arithmetic, incompatible units, saved edits, and version-1 backup compatibility. The workflow suite uses a simulated DOM for workflow tests covering the planner, persistence, deletion, recipe creation and editing, tags, validation, failed storage writes, project attachment and return, skipping, and ingredient aggregation. Run `node --check public/app.js` and `node --check server.mjs` for syntax checks. Browser visual QA is not part of this test suite.
 
 ## Ingredient list editing
 

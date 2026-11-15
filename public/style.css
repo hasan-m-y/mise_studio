@@ -1494,3 +1494,10 @@ a.tl-axis-row:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
 
 
 .recipe-title-row{display:flex;align-items:center;justify-content:space-between;gap:20px}.recipe-title-row>.save-button{flex-shrink:0}@media(max-width:500px){.recipe-title-row{flex-wrap:wrap}}
+
+.ingredient-quantity { display: block; font-size: .88rem; color: #596579; }
+.ingredient-details { flex-basis: 100%; font-size: .82rem; color: #596579; }
+.ingredient-details summary { cursor: pointer; }
+.ingredient-details ul { padding-left: 1.2rem; }
+.ingredient-details li { display: list-item; padding: .2rem 0; border: 0; }
+.ingredient-list > li { flex-wrap: wrap; }
