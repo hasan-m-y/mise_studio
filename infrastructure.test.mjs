@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createAppServer } from "./server.mjs";
 import { validateWorkspace, loadWorkspace } from "./public/storage.js";
 import { once } from "node:events";
@@ -42,6 +43,53 @@ try {
     });
     assert.equal(cached.status, 304);
     assert.equal(await cached.text(), "");
+  }
+  const html = await (await fetch(base + "/")).text();
+  assert.ok(!html.includes('href="data:,"'));
+  const iconLinks = [...html.matchAll(/<link\b[^>]*rel="(?:icon|shortcut icon|apple-touch-icon)"[^>]*>/g)];
+  assert.equal(iconLinks.length, 4);
+  for (const [name, size] of [
+    ["favicon.ico", null],
+    ["favicon-16x16.png", 16],
+    ["favicon-32x32.png", 32],
+    ["favicon-48x48.png", 48],
+    ["apple-touch-icon.png", 180],
+  ]) {
+    const path = "/" + name;
+    const res = await fetch(base + path, { headers: { "Accept-Encoding": "identity" } });
+    assert.equal(res.status, 200, path);
+    assert.equal(res.headers.get("content-type"), size ? "image/png" : "image/x-icon");
+    assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+    assert.match(res.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+    assert.equal(res.headers.get("cache-control"), "no-cache");
+    const body = Buffer.from(await res.arrayBuffer());
+    assert.deepEqual(body, await readFile(new URL("./public/" + name, import.meta.url)));
+    if (size) {
+      assert.equal(body.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+      assert.equal(body.readUInt32BE(16), size);
+      assert.equal(body.readUInt32BE(20), size);
+    } else {
+      assert.equal(body.readUInt16LE(2), 1);
+      assert.equal(body.readUInt16LE(4), 3);
+      assert.deepEqual([0, 1, 2].map(i => body[6 + i * 16]), [16, 32, 48]);
+    }
+    const head = await fetch(base + path, { method: "HEAD", headers: { "Accept-Encoding": "identity" } });
+    assert.equal(head.status, 200);
+    assert.equal((await head.arrayBuffer()).byteLength, 0);
+    for (const header of ["content-type", "content-length", "etag", "cache-control"])
+      assert.equal(head.headers.get(header), res.headers.get(header));
+    for (const method of ["GET", "HEAD"]) {
+      const cached = await fetch(base + path, { method, headers: { "Accept-Encoding": "identity", "If-None-Match": res.headers.get("etag") } });
+      assert.equal(cached.status, 304);
+      assert.equal((await cached.arrayBuffer()).byteLength, 0);
+    }
+  }
+  for (const [link] of iconLinks) {
+    const href = /href="([^"]+)"/.exec(link)[1];
+    assert.ok(href.startsWith("./"));
+    const resolved = new URL(href, "https://hasan-m-y.github.io/mise_studio/");
+    assert.ok(resolved.pathname.startsWith("/mise_studio/"));
+    await readFile(new URL("./public/" + resolved.pathname.slice("/mise_studio/".length), import.meta.url));
   }
   const compressed = await fetch(base + "/app.js", {
     headers: { "Accept-Encoding": "gzip" },
@@ -110,5 +158,5 @@ assert.equal(
 );
 assert.throws(() => loadWorkspace({ getItem: () => "{invalid" }, "current"));
 console.log(
-  "PASS: production HTTP routes, HEAD, conditional caching, security headers, private-file denial, removed endpoints, method handling, legacy storage migration, schema validation and safe record maps.",
+  "PASS: production HTTP routes, favicon assets and subpath links, HEAD, conditional caching, security headers, private-file denial, removed endpoints, method handling, legacy storage migration, schema validation and safe record maps.",
 );

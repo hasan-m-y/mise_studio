@@ -10,6 +10,11 @@ const routes = new Map([
   ["/timeline-model.js", ["timeline-model.js", "text/javascript"]],
   ["/storage.js", ["storage.js", "text/javascript"]],
   ["/style.css", ["style.css", "text/css"]],
+  ["/favicon.ico", ["favicon.ico", "image/x-icon"]],
+  ["/favicon-16x16.png", ["favicon-16x16.png", "image/png"]],
+  ["/favicon-32x32.png", ["favicon-32x32.png", "image/png"]],
+  ["/favicon-48x48.png", ["favicon-48x48.png", "image/png"]],
+  ["/apple-touch-icon.png", ["apple-touch-icon.png", "image/png"]],
 ]);
 const pageRoute =
   /^\/(?:recipes\/?|recipe\/(?:new|edit)\/[a-zA-Z0-9-]+\/?|project\/[a-zA-Z0-9-]+\/?)$/;
@@ -85,7 +90,7 @@ export function createAppServer() {
         res.setHeader("Content-Encoding", "gzip");
         entry = gzip;
       }
-      res.setHeader("Content-Type", `${type}; charset=utf-8`);
+      res.setHeader("Content-Type", type.startsWith("text/") ? `${type}; charset=utf-8` : type);
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("ETag", entry.etag);
       if (
